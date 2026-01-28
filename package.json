@@ -1,0 +1,19 @@
+{
+  "name": "newmarketingapp",
+  "version": "1.0.0",
+  "description": "Šiame pakete yra VISKAS ko reikia, kad pradėtumėte pardavinėti DevReview AI:",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2"
+  }
+}

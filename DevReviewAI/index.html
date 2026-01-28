@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevReview AI PRO</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
+<style>
+/* Tavo CSS iš ankstesnio HTML (pavyzdys) */
+body {
+    font-family: 'JetBrains Mono', monospace;
+    background: #0a0a0f;
+    color: #fff;
+    margin: 0;
+    padding: 0;
+}
+.container { max-width: 1200px; margin: auto; padding: 2rem; }
+textarea { width: 100%; min-height: 300px; border-radius: 12px; background: #13131a; color: #fff; padding: 1rem; border: 1px solid #2a2a38; font-family: 'JetBrains Mono', monospace; }
+button { padding: 0.8rem 1rem; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; }
+#resultsPanel { margin-top: 1rem; }
+.result-section { background: #1a1a24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #00ff88; }
+.result-title { font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+.result-content { margin-top: 0.5rem; color: #a0a0b8; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>DevReview AI PRO</h1>
+
+    <label for="codeInput">Įveskite kodą:</label>
+    <textarea id="codeInput" placeholder="// Įklijuokite kodą čia"></textarea>
+
+    <label for="customPrompt">Specialus fokusas (PRO):</label>
+    <input type="text" id="customPrompt" placeholder="Pvz: Patikrinti performance arba security" style="width:100%; padding:0.5rem; border-radius:8px; margin-top:0.5rem; background:#13131a; border:1px solid #2a2a38; color:#fff;">
+
+    <label for="languageSelect">Pasirinkite kalbą:</label>
+    <select id="languageSelect" style="width:100%; padding:0.5rem; border-radius:8px; margin-top:0.5rem; background:#13131a; border:1px solid #2a2a38; color:#fff;">
+        <option value="javascript">JavaScript</option>
+        <option value="react">React</option>
+        <option value="html">HTML/CSS</option>
+        <option value="nodejs">Node.js</option>
+        <option value="typescript">TypeScript</option>
+    </select>
+
+    <button id="analyzeBtn" style="background:#00ff88; color:#0a0a0f;">Analizuoti su AI</button>
+
+    <div id="resultsPanel">
+        <p style="color:#60607a;">Rezultatai pasirodys čia...</p>
+    </div>
+</div>
+
+<script>
+lucide.createIcons();
+
+const analyzeBtn = document.getElementById('analyzeBtn');
+const codeInput = document.getElementById('codeInput');
+const customPrompt = document.getElementById('customPrompt');
+const languageSelect = document.getElementById('languageSelect');
+const resultsPanel = document.getElementById('resultsPanel');
+
+analyzeBtn.addEventListener('click', async () => {
+    const code = codeInput.value.trim();
+    const prompt = customPrompt.value.trim();
+    const language = languageSelect.value;
+
+    if(!code) { alert('Įveskite kodą!'); return; }
+
+    resultsPanel.innerHTML = `<p style="color:#00ff88;">Analizuoju kodą su AI...</p>`;
+
+    try {
+        const res = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, language, customPrompt: prompt })
+        });
+
+        const data = await res.json();
+
+        // bandymas gauti JSON iš AI
+        let result;
+        try {
+            const jsonMatch = data.content[0].text.match(/\{[\s\S]*\}/);
+            result = JSON.parse(jsonMatch[0]);
+        } catch {
+            result = { score: 75, issues:[{type:'success',title:'Analizė baigta',description:data.content[0].text}], suggestions:[], summary:data.content[0].text };
+        }
+
+        displayResults(result);
+
+    } catch(err) {
+        resultsPanel.innerHTML = `<p style="color:#ff3366;">Klaida: ${err.message}</p>`;
+    }
+});
+
+function displayResults(result){
+    let html = '';
+    if(result.issues && result.issues.length>0){
+        result.issues.forEach(issue => {
+            html += `<div class="result-section ${issue.type}">
+                <div class="result-title">
+                    <i data-lucide="${issue.type==='error'?'x-circle':issue.type==='warning'?'alert-triangle':'check-circle'}"></i>
+                    ${issue.title}
+                </div>
+                <div class="result-content">${issue.description}</div>
+            </div>`;
+        });
+    }
+    if(result.suggestions && result.suggestions.length>0){
+        html += `<div class="result-section">
+            <div class="result-title"><i data-lucide="lightbulb"></i> Patarimai</div>
+            <div class="result-content"><ul>${result.suggestions.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+        </div>`;
+    }
+    if(result.summary){
+        html += `<div class="result-section">
+            <div class="result-title"><i data-lucide="file-text"></i> Santrauka</div>
+            <div class="result-content">${result.summary}</div>
+        </div>`;
+    }
+
+    resultsPanel.innerHTML = html;
+    lucide.createIcons();
+}
+</script>
+</body>
+</html>
