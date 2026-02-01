@@ -1,19 +1,16 @@
 {
   "name": "newmarketingapp",
-  "version": "1.0.0",
-  "description": "Šiame pakete yra VISKAS ko reikia, kad pradėtumėte pardavinėti DevReview AI:",
-  "main": "index.js",
   "type": "module",
+  "version": "1.0.0",
+  "main": "server.js",
   "scripts": {
-  "start": "node server.js"
-},
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+    "start": "node server.js"
+  },
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
     "node-fetch": "^3.3.2"
   }
 }
+

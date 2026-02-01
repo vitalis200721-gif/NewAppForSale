@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevReview AI PRO Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+body{font-family:'JetBrains Mono',monospace;background:#0a0a0f;color:#fff;padding:1rem;}
+textarea,input{width:100%;padding:0.5rem;border-radius:6px;border:none;margin-bottom:0.5rem;background:#111;color:#fff;}
+.btn{padding:0.5rem 1rem;margin:0.3rem;cursor:pointer;border-radius:6px;border:none;}
+.btn-primary{background:#00ff88;color:#000;}
+.btn-secondary{background:#555;color:#fff;}
+.btn-export{background:#ffd700;color:#000;}
+.results-panel{background:#222;padding:1rem;border-radius:8px;min-height:100px;margin-top:1rem;}
+</style>
+</head>
+<body>
+
+<h1>DevReview AI PRO Demo</h1>
+
+<label>Kodas:</label>
+<textarea id="codeInput">// Įklijuok savo kodą čia...</textarea>
+
+<label>Custom AI Prompt (PRO)</label>
+<input type="text" id="customPrompt" placeholder="Pvz: Patikrinti performance ar security">
+
+<div>
+<button class="btn btn-primary" id="analyzeBtn">Analizuoti su AI</button>
+<button class="btn btn-export" id="exportBtn">Export PDF</button>
+<button class="btn btn-secondary" id="clearBtn">Išvalyti</button>
+</div>
+
+<div class="results-panel" id="resultsPanel">Įveskite kodą ir spauskite "Analizuoti su AI"</div>
+
+<script>
+lucide.createIcons();
+
+let lastReviewResult = null;
+
+// LocalStorage istorija
+function saveHistory(result){
+    let history = JSON.parse(localStorage.getItem('reviewHistory')||'[]');
+    history.unshift({timestamp:Date.now(),result});
+    localStorage.setItem('reviewHistory',JSON.stringify(history.slice(0,10)));
+}
+
+// Clear
+document.getElementById('clearBtn').addEventListener('click',()=>{
+    document.getElementById('codeInput').value='';
+    document.getElementById('customPrompt').value='';
+    document.getElementById('resultsPanel').textContent='Įveskite kodą ir spauskite "Analizuoti su AI"';
+});
+
+// Analyze (fake AI)
+document.getElementById('analyzeBtn').addEventListener('click',async()=>{
+    const code = document.getElementById('codeInput').value.trim();
+    const prompt = document.getElementById('customPrompt').value.trim();
+    if(!code){ alert('Įveskite kodą analizei!'); return; }
+
+    const resultsPanel=document.getElementById('resultsPanel');
+    resultsPanel.textContent='AI analizuoja kodą...';
+    await new Promise(r=>setTimeout(r,800));
+
+    // fake AI result
+    const result={
+        score:Math.floor(Math.random()*21)+80,
+        issues:[
+            {type:'success',title:'Kodas tvarkingas',description:'Kodas gerai struktūrizuotas.'},
+            {type:'warning',title:'Komentarai trūksta',description:'Patarimas pridėti daugiau komentarų.'}
+        ],
+        suggestions:['Naudok const vietoje let','Optimizuok ciklus'],
+        summary:'Kodas tvarkingas, bet reiktų pridėti komentarų ir optimizacijos.'
+    };
+    lastReviewResult=result;
+    saveHistory(result);
+
+    // rodyti result
+    let html='';
+    result.issues.forEach(issue=>{
+        html+=`<div style="border-left:4px solid ${issue.type==='error'?'#ff3366':issue.type==='warning'?'#ffaa00':'#00ff88'};padding:0.3rem;margin:0.3rem 0;">
+        <strong>${issue.title}:</strong> ${issue.description}</div>`;
+    });
+    if(result.suggestions.length>0){
+        html+='<div><strong>Patarimai:</strong><ul>'+result.suggestions.map(s=>`<li>${s}</li>`).join('')+'</ul></div>';
+    }
+    html+='<div><strong>Santrauka:</strong> '+result.summary+'</div>';
+    resultsPanel.innerHTML=html;
+});
+
+// Export PDF
+document.getElementById('exportBtn').addEventListener('click',()=>{
+    if(!lastReviewResult){ alert('Pirma atlikite kodo analizę!'); return; }
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF();
+    doc.setFontSize(16); doc.text('DevReview AI - Ataskaita',20,20);
+    doc.text('Įvertinimas: '+lastReviewResult.score+'/100',20,30);
+    doc.setFontSize(12);
+    doc.text('Santrauka: '+lastReviewResult.summary,20,40);
+    doc.save('code-review.pdf');
+    alert('✅ PDF sėkmingai eksportuota!');
+});
+</script>
+
+</body>
+</html>
