@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DevReview AI Demo</title>
+    <style>
+        body { font-family: monospace; background: #0a0a0f; color: #fff; padding: 2rem; }
+        textarea, input { width: 100%; margin: 0.5rem 0; padding: 0.5rem; border-radius: 6px; border: 1px solid #333; background: #13131a; color: #fff; }
+        button { padding: 0.6rem 1rem; margin: 0.5rem 0; cursor: pointer; border-radius: 6px; border: none; background: #00ff88; color: #000; font-weight: bold; }
+        #resultsPanel { margin-top: 1rem; background: #13131a; padding: 1rem; border-radius: 8px; min-height: 150px; }
+        .issue { margin-bottom: 0.5rem; padding: 0.5rem; border-left: 4px solid #00ff88; }
+        .success { border-left-color: #00ff88; }
+        .warning { border-left-color: #ffaa00; }
+        .error { border-left-color: #ff3366; }
+    </style>
+</head>
+<body>
+    <h1>DevReview AI Demo</h1>
+
+    <textarea id="codeInput" rows="10" placeholder="// Įklijuokite kodą čia..."></textarea>
+    <input id="customPrompt" placeholder="Pasirinktinis promptas (nebūtina)">
+    <button id="analyzeBtn">Analizuoti</button>
+
+    <div>
+        <strong>Statistika:</strong>
+        <p>Total Reviews: <span id="totalReviews">0</span> | Average Score: <span id="avgScore">--</span></p>
+    </div>
+
+    <div id="resultsPanel">Įveskite kodą ir spauskite "Analizuoti"</div>
+
+    <script src="main.js"></script>
+</body>
+</html>
