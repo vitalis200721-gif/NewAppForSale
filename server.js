@@ -7,11 +7,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
+// Replace with dynamic token system or Gumroad webhook later
+const VALID_TOKENS = ["PREMIUM-123", "VIP-456"];
+
 app.post("/api/analyze", async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: "No code provided" });
 
+  const auth = req.headers.authorization;
+  const token = auth?.split(" ")[1];
+
+  if (!VALID_TOKENS.includes(token)) {
+    return res.json({ error: "PREMIUM_REQUIRED" });
+  }
+
   try {
+    // Call your local LLaMA server
     const aiResponse = await fetch("http://127.0.0.1:8080/v1/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -35,8 +46,6 @@ ${code}
     });
 
     const data = await aiResponse.json();
-
-    // tiesiogiai grąžiname LLaMA atsakymą front-end
     res.json(data);
 
   } catch (err) {
@@ -47,12 +56,5 @@ ${code}
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Serveris veikia: http://localhost:${PORT}`);
+  console.log(`Server running: http://localhost:${PORT}`);
 });
-
-
-
-
-
-
-
