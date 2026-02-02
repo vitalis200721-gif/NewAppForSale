@@ -15,39 +15,63 @@ loadFromStorage();
 updateStatsUI();
 
 async function analyzeCode() {
-    const code = codeInput.value.trim();
-    const prompt = customPrompt.value.trim();
-    if (!code) {
-        alert("Įklijuokite kodą!");
-        return;
-    }
+  const code = codeInput.value.trim();
+  if (!code) {
+    alert("Įklijuokite kodą!");
+    return;
+  }
 
-    resultsPanel.innerHTML = "Analizuojama...";
+  resultsPanel.innerHTML = "Analizuojama...";
 
-    try {
-        const response = await fetch("http://localhost:3001/api/analyze", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ code })
-});
-
-
-        const data = await response.json();
-        let aiResponse;
-        try {
-            aiResponse = JSON.parse(data.content[0].text);
-        } catch {
-            aiResponse = { score: 75, issues: [], suggestions: [], summary: "Nepavyko gauti tikslaus JSON, bet analizė baigta." };
-        }
-
-        renderResult(aiResponse);
-        saveReview(aiResponse);
-
-    } catch (error) {
-        console.error(error);
-        resultsPanel.textContent = "❌ Klaida jungiantis prie serverio.";
-    }
+  try {
+    const response = await fetch("http://127.0.0.1:8080/v1/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        prompt: `
+Return ONLY valid JSON in this exact format:
+{
+  "score": number (0-100),
+  "issues": [
+    {"type":"error|warning|info","title":"string","description":"string"}
+  ],
+  "suggestions": ["string"],
+  "summary": "string"
 }
+
+Analyze this code:
+${code}
+`,
+        max_tokens: 300
+      })
+    });
+
+    const data = await response.json();
+
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(data.choices[0].text);
+    } catch (e) {
+      console.log("RAW AI:", data.choices[0].text);
+      aiResponse = {
+        score: 70,
+        issues: [],
+        suggestions: [],
+        summary: "AI grąžino ne JSON, bet analizė baigta."
+      };
+    }
+
+    renderResult(aiResponse);
+    saveReview(aiResponse);
+
+  } catch (error) {
+    console.error(error);
+    resultsPanel.textContent = "❌ Klaida jungiantis prie AI serverio.";
+  }
+}
+
 
 function renderResult(result) {
     let html = `<h3>Score: ${result.score}</h3>`;
