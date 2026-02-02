@@ -1,28 +1,38 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch"; // npm install node-fetch
+import fetch from "node-fetch";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-// Replace with dynamic token system or Gumroad webhook later
-const VALID_TOKENS = ["PREMIUM-123", "VIP-456"];
+const GUMROAD_PRODUCT_ID = "YOUR_GUMROAD_PRODUCT_ID"; // čia įrašyk savo produktą
 
+// Funkcija patikrinti prenumeratą
+async function checkGumroadLicense(purchaseCode) {
+  const res = await fetch(`https://api.gumroad.com/v2/licenses/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `product_permalink=${GUMROAD_PRODUCT_ID}&license_key=${purchaseCode}`
+  });
+
+  const data = await res.json();
+  return data.success; // true, jei vartotojas tikrai nusipirkęs
+}
+
+// AI analizės endpoint
 app.post("/api/analyze", async (req, res) => {
-  const { code } = req.body;
+  const { code, license } = req.body;
+
   if (!code) return res.status(400).json({ error: "No code provided" });
+  if (!license) return res.status(403).json({ error: "Premium required! Please buy a license." });
 
-  const auth = req.headers.authorization;
-  const token = auth?.split(" ")[1];
-
-  if (!VALID_TOKENS.includes(token)) {
-    return res.json({ error: "PREMIUM_REQUIRED" });
-  }
+  // Patikrinam licenciją
+  const valid = await checkGumroadLicense(license);
+  if (!valid) return res.status(403).json({ error: "Invalid license! Please buy premium." });
 
   try {
-    // Call your local LLaMA server
     const aiResponse = await fetch("http://127.0.0.1:8080/v1/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -40,7 +50,7 @@ Return ONLY valid JSON in this exact format:
 
 Analyze this code:
 ${code}
-`,
+        `,
         max_tokens: 300
       })
     });
@@ -55,6 +65,4 @@ ${code}
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running: http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`Serveris veikia: http://localhost:${PORT}`));

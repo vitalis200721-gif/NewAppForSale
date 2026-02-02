@@ -15,63 +15,51 @@ updateStatsUI();
 
 async function analyzeCode() {
   const code = codeInput.value.trim();
-  if (!code) return alert("Please enter code!");
+  const license = prompt("Enter your premium license key"); // or save license in localStorage
+
+  if (!code) { 
+    alert("Please paste your code!"); 
+    return; 
+  }
 
   resultsPanel.innerHTML = "Analyzing...";
-
-  const token = localStorage.getItem("premium_token");
 
   try {
     const response = await fetch("/api/analyze", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": token ? `Bearer ${token}` : ""
-      },
-      body: JSON.stringify({ code })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, license })
     });
 
     const data = await response.json();
 
-    if (data.error === "PREMIUM_REQUIRED") {
-      resultsPanel.innerHTML = `
-        <h3>🔒 Premium Only</h3>
-        <p>To use AI Review, you must purchase Premium.</p>
-        <a href="https://vitalis12.gumroad.com/l/ahrpas" target="_blank">
-          <button>Buy Premium</button>
-        </a>
-      `;
+    if (data.error) {
+      resultsPanel.innerHTML = `❌ ${data.error}`;
       return;
     }
 
     let aiResponse;
-
-    try {
-      if (data.choices && data.choices[0] && data.choices[0].text) {
-        aiResponse = JSON.parse(data.choices[0].text);
-      } else if (data.content && data.content[0] && data.content[0].text) {
-        aiResponse = JSON.parse(data.content[0].text);
-      } else {
-        aiResponse = data;
-      }
-    } catch (e) {
-      console.log("RAW AI:", JSON.stringify(data));
+    try { 
+      aiResponse = JSON.parse(data.choices[0].text); 
+    } catch {
       aiResponse = {
         score: 70,
         issues: [],
         suggestions: [],
-        summary: "AI returned invalid JSON, analysis done."
-      };
+        summary: "AI did not return valid JSON."
+      }; 
     }
 
     renderResult(aiResponse);
     saveReview(aiResponse);
 
-  } catch (error) {
-    console.error(error);
-    resultsPanel.textContent = "❌ Cannot reach AI server.";
+  } catch (err) {
+    console.error(err);
+    resultsPanel.textContent = "❌ Error connecting to the AI server.";
   }
 }
+
+
 
 function renderResult(result) {
   let html = `<h3>Score: ${result.score}</h3>`;
