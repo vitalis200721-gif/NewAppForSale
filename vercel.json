@@ -1,0 +1,12 @@
+{
+  "routes": [
+    {
+      "src": "/googlee92314729c2ddde.html",
+      "dest": "/public/googlee92314729c2ddde.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/server.js"
+    }
+  ]
+}
