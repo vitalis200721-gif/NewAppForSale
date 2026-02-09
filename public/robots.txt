@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://new-app-for-sale-6ozl.vercel.app/sitemap.xml
