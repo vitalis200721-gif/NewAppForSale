@@ -50,15 +50,22 @@ async function verifyGumroadLicense({ productPermalink, licenseKey }) {
 }
 
 async function callAI({ code, language }) {
-  // Variantas per OpenAI (jei nori tikro AI per API)
-  // Reikia env: OPENAI_API_KEY
   const apiKey = process.env.OPENAI_API_KEY;
+
+  // ✅ Jei nėra AI key – testui grąžinam server-side demo (kad nelūžtų 500)
   if (!apiKey) {
-    // jei nenori OpenAI, gali pakeist į savo AI endpoint’ą
-    // pvz: return await fetch(process.env.AI_API_URL, ...)
-    throw new Error("Missing OPENAI_API_KEY");
+    return {
+      score: 85,
+      issues: [
+        { type: "success", title: "API working", description: "Server returned a valid JSON response." },
+        { type: "warning", title: "AI key missing", description: "Set OPENAI_API_KEY in Vercel to enable real AI." }
+      ],
+      suggestions: ["Add OPENAI_API_KEY env var on Vercel", "Then redeploy"],
+      summary: `Demo response. Language=${language || "unknown"}. Code length=${code?.length || 0}.`
+    };
   }
 
+  // --- čia lieka tavo realus OpenAI kvietimas kaip buvo ---
   const system = `You are a senior developer performing a strict code review.
 Return ONLY valid JSON in this exact format:
 {
@@ -92,31 +99,20 @@ ${code}`;
   });
 
   const data = await r.json().catch(() => ({}));
-  const content =
-    data?.choices?.[0]?.message?.content ||
-    data?.choices?.[0]?.text ||
-    "";
+  const content = data?.choices?.[0]?.message?.content || "";
 
-  // Bandome parse’inti JSON
   try {
-    const parsed = JSON.parse(content);
-    return parsed;
+    return JSON.parse(content);
   } catch {
-    // jei AI kažką “prikepė” ne JSON — gražinam fallback
     return {
       score: 70,
-      issues: [
-        {
-          type: "warning",
-          title: "AI output not valid JSON",
-          description: "Model did not return clean JSON. Try again.",
-        },
-      ],
+      issues: [{ type: "warning", title: "AI output not valid JSON", description: content.slice(0, 200) }],
       suggestions: [],
       summary: content.slice(0, 500) || "No output",
     };
   }
 }
+
 
 module.exports = async (req, res) => {
   try {
