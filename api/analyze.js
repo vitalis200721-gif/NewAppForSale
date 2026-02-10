@@ -19,7 +19,8 @@ export default async function handler(req, res) {
     const { code, language } = body || {};
 
     if (!code || typeof code !== "string") {
-      return res.status(200).json({ ok: true, version: VERSION });
+      return res.status(200).json({ ok: true, deployedCommit: "5ace81f" });
+
 
     }
 
