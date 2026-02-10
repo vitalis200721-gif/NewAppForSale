@@ -1,3 +1,5 @@
+const VERSION = "v-2026-02-10-1";
+
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
@@ -17,7 +19,8 @@ export default async function handler(req, res) {
     const { code, language } = body || {};
 
     if (!code || typeof code !== "string") {
-      return res.status(400).json({ error: "Code is required" });
+      return res.status(200).json({ ok: true, version: VERSION });
+
     }
 
     // 🔒 laikinas fake AI (kad niekas nelūžtų)
