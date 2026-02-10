@@ -1,90 +1,164 @@
-export const config = {
-  runtime: "nodejs",
-};
+// api/analyze.js
+// Vercel Serverless Function: POST https://your-site.vercel.app/api/analyze
 
-async function verifyGumroadLicense(licenseKey) {
-  const productPermalink = process.env.GUMROAD_PRODUCT_PERMALINK;
-  if (!productPermalink) throw new Error("Missing GUMROAD_PRODUCT_PERMALINK");
+function send(res, status, data) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.end(JSON.stringify(data));
+}
 
-  const body = new URLSearchParams({
+async function readJsonBody(req) {
+  // Vercel dažnai jau paduoda req.body kaip objektą, bet kartais būna string.
+  if (req.body && typeof req.body === "object") return req.body;
+
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString("utf8");
+
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function formUrlEncoded(obj) {
+  return Object.entries(obj)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join("&");
+}
+
+async function verifyGumroadLicense({ productPermalink, licenseKey }) {
+  const url = "https://api.gumroad.com/v2/licenses/verify";
+  const body = formUrlEncoded({
     product_permalink: productPermalink,
     license_key: licenseKey,
+    // galima pridėti: increment_uses_count: "false"
   });
 
-  const r = await fetch("https://api.gumroad.com/v2/licenses/verify", {
+  const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
 
-  const data = await r.json();
-  return Boolean(data?.success);
+  const data = await r.json().catch(() => ({}));
+  // Gumroad grąžina { success: true/false, ... }
+  return Boolean(data && data.success);
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+async function callAI({ code, language }) {
+  // Variantas per OpenAI (jei nori tikro AI per API)
+  // Reikia env: OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    // jei nenori OpenAI, gali pakeist į savo AI endpoint’ą
+    // pvz: return await fetch(process.env.AI_API_URL, ...)
+    throw new Error("Missing OPENAI_API_KEY");
+  }
 
-  try {
-    const { code, language, licenseKey } = req.body || {};
-    const lk = licenseKey || req.headers["x-license-key"];
-
-    if (!code) return res.status(400).json({ error: "No code provided" });
-    if (!lk) return res.status(401).json({ error: "License required" });
-
-    const ok = await verifyGumroadLicense(lk);
-    if (!ok) return res.status(403).json({ error: "Invalid license" });
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: "Server missing OPENAI_API_KEY" });
-
-    // OpenAI Responses API (recommended for new projects)
-    const prompt = `
+  const system = `You are a senior developer performing a strict code review.
 Return ONLY valid JSON in this exact format:
 {
-  "score": number (0-100),
+  "score": number,
   "issues": [
-    {"type":"error|warning|info","title":"string","description":"string"}
+    {"type":"error|warning|success","title":"string","description":"string"}
   ],
   "suggestions": ["string"],
   "summary": "string"
 }
+No extra text.`;
 
-Analyze this ${language || "code"}:
-${code}
-`;
+  const user = `Language: ${language || "unknown"}
+Analyze this code:
+${code}`;
 
-    const r = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        input: prompt,
-      }),
-    });
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
 
-    if (!r.ok) {
-      const t = await r.text();
-      return res.status(502).json({ error: "AI provider error", detail: t.slice(0, 500) });
-    }
+  const data = await r.json().catch(() => ({}));
+  const content =
+    data?.choices?.[0]?.message?.content ||
+    data?.choices?.[0]?.text ||
+    "";
 
-    const data = await r.json();
-    // Iš Responses API ištraukiam tekstą
-    const text =
-      data.output?.[0]?.content?.find?.((c) => c.type === "output_text")?.text ||
-      data.output_text ||
-      "";
-
-    // Bandome parse'inti JSON, jei nepavyksta – grąžinam kaip tekstą
-    try {
-      const parsed = JSON.parse(text);
-      return res.status(200).json(parsed);
-    } catch {
-      return res.status(200).json({ raw: text });
-    }
-  } catch (e) {
-    return res.status(500).json({ error: "Server error", detail: String(e?.message || e) });
+  // Bandome parse’inti JSON
+  try {
+    const parsed = JSON.parse(content);
+    return parsed;
+  } catch {
+    // jei AI kažką “prikepė” ne JSON — gražinam fallback
+    return {
+      score: 70,
+      issues: [
+        {
+          type: "warning",
+          title: "AI output not valid JSON",
+          description: "Model did not return clean JSON. Try again.",
+        },
+      ],
+      suggestions: [],
+      summary: content.slice(0, 500) || "No output",
+    };
   }
 }
+
+module.exports = async (req, res) => {
+  try {
+    if (req.method !== "POST") {
+      return send(res, 405, { error: "Method Not Allowed" });
+    }
+
+    const body = await readJsonBody(req);
+    const code = (body.code || "").trim();
+    const language = (body.language || "").trim();
+    const licenseKey = (body.licenseKey || body.license || "").trim();
+
+    if (!code) return send(res, 400, { error: "No code provided" });
+
+    // 1) DEV bypass (kad tau nereikėtų pirkti)
+    // Vercel ENV: DEV_LICENSE_KEY=DEV-OK-12345 (pvz)
+    const devKey = process.env.DEV_LICENSE_KEY;
+    const isDevBypass = devKey && licenseKey === devKey;
+
+    // 2) PRO tikrinimas
+    if (!isDevBypass) {
+      if (!licenseKey) return send(res, 403, { error: "License required" });
+
+      const productPermalink = process.env.GUMROAD_PRODUCT_PERMALINK;
+      if (!productPermalink) {
+        return send(res, 500, { error: "Server misconfigured: missing GUMROAD_PRODUCT_PERMALINK" });
+      }
+
+      const valid = await verifyGumroadLicense({
+        productPermalink,
+        licenseKey,
+      });
+
+      if (!valid) return send(res, 403, { error: "Invalid license" });
+    }
+
+    // 3) AI analizė (tik jei praėjo licenciją arba DEV bypass)
+    const result = await callAI({ code, language });
+
+    return send(res, 200, result);
+  } catch (err) {
+    console.error(err);
+    return send(res, 500, { error: "Server error", details: String(err?.message || err) });
+  }
+};
