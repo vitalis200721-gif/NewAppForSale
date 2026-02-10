@@ -903,37 +903,71 @@ document.getElementById('clearBtn').addEventListener('click', () => {
 });
 
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
-    const code = document.getElementById('codeInput').value.trim();
-    if (!code) { alert('Please enter code to analyze!'); return; }
-    const btn = document.getElementById('analyzeBtn');
-    const panel = document.getElementById('resultsPanel');
-    btn.disabled = true;
-    panel.innerHTML = `<div class="loading"><div class="spinner"></div><span>AI analyzing code...</span></div>`;
-    await new Promise(r=>setTimeout(r,800));
+  const code = document.getElementById('codeInput').value.trim();
+  if (!code) { alert('Please enter code to analyze!'); return; }
 
-    const fakeAI = {
-        score: Math.floor(Math.random()*21)+80,
-        issues: [
-            { type: 'success', title: 'Code well structured', description: 'All functions are clearly separated.' },
-            { type: 'warning', title: 'Comments missing', description: 'Consider adding more comments in complex sections.' }
-        ],
-        suggestions: ['Use const instead of let when possible','Optimize loops'],
-        summary: 'Code is clean but could use more comments and optimization.'
-    };
-    lastReviewResult = fakeAI;
-    displayResults(fakeAI);
+  // PRO license (MVP)
+  let licenseKey = localStorage.getItem('licenseKey');
+  if (!licenseKey) {
+    licenseKey = prompt('Enter your Gumroad license key (PRO required):');
+    if (!licenseKey) return;
+    localStorage.setItem('licenseKey', licenseKey.trim());
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  const panel = document.getElementById('resultsPanel');
+
+  btn.disabled = true;
+  panel.innerHTML = `<div class="loading"><div class="spinner"></div><span>AI analyzing code...</span></div>`;
+
+  try {
+    const r = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        language: currentLanguage,
+        licenseKey
+      })
+    });
+
+    if (r.status === 401 || r.status === 403) {
+      const j = await r.json().catch(()=>({}));
+      panel.innerHTML = `
+        <div class="result-section error">
+          <div class="result-title">
+            <i data-lucide="x-circle" style="width:20px;height:20px;"></i>
+            Access denied
+          </div>
+          <div class="result-content">${j.error || 'License required'}</div>
+        </div>`;
+      lucide.createIcons();
+      localStorage.removeItem('licenseKey');
+      return;
+    }
+
+    const data = await r.json();
+
+    lastReviewResult = data;
+    displayResults(data);
 
     statistics.totalReviews++;
-    statistics.totalScore += fakeAI.score;
+    statistics.totalScore += Number(data.score || 0);
 
-    reviewHistory.unshift({ language: currentLanguage, timestamp: Date.now(), score: fakeAI.score, result: fakeAI });
+    reviewHistory.unshift({ language: currentLanguage, timestamp: Date.now(), score: data.score, result: data });
 
     saveToStorage();
     updateStatistics();
-    updateScoreDisplay(fakeAI.score);
+    updateScoreDisplay(data.score || 0);
     renderHistory();
+
+  } catch (e) {
+    panel.innerHTML = `<div class="result-section error"><div class="result-content">${e}</div></div>`;
+  } finally {
     btn.disabled = false;
+  }
 });
+
 
 document.getElementById('exportBtn').addEventListener('click', () => {
     if (!lastReviewResult) { alert('Please run code analysis first!'); return; }
